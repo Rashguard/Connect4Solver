@@ -26,7 +26,7 @@ class Game(object):
         self.winner = None
         self.players[0] = None
 
-        print("Do you go first or second?")
+        print("Do you want to go first or second?")
 
         while self.players[0] is None:
 
@@ -140,6 +140,7 @@ class Game(object):
 
     def diagonalCheck(self, row, column):
 
+        connectFour = False
         count = 0
         line = 0
 
@@ -177,7 +178,7 @@ class Game(object):
                 self.winner = self.players[0]
             else:
                 self.winner = self.players[1]
-
+                
         if count > 0:
             return True
         return False
