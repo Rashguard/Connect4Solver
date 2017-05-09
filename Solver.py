@@ -1,4 +1,6 @@
-import random
+# -*- coding: utf-8 -*-
+from __future__ import print_function
+from time import time
 
 
 class Solver(object):
@@ -10,11 +12,12 @@ class Solver(object):
     board = None
     colors = ["o", "x"]
 
-    def __init__(self, board):
+    def __init__(self, board, color):
 
         self.board = [x[:] for x in board]
+        self.AIcolor = color
 
-    def bestMoveSearch(self, depth, board, currentPlayer):
+    def bestMoveSearch(self, depth, board, currentPlayer, phase):
 
         # return the best column number and the corresponding alpha value using search (option 1)
 
@@ -23,74 +26,124 @@ class Solver(object):
         else:
             enemyPlayer = self.colors[0]
 
-        legal_moves = {}
-
-        for column in range(7):  # 0~6
-            if self.isLegalMove(column, board):
-                temp = self.makeMove(board, column, currentPlayer)
-                legal_moves[column] = -self.search(depth, temp, enemyPlayer)  # puts in the alpha values of each choice
-
+        currPhase = phase
         best_alpha = -999999
         best_move = None
+        start = time()
 
-        moves = legal_moves.items()
+        #############################################################################
 
-        random.shuffle(list(moves))
+        columns = [3, 2, 4, 1, 5, 0, 6]
 
-        for move, alpha in moves:
+        if currPhase <= 6:
+            legal_moves = {3: 5, 2: 0, 4: 0, 1: 0, 5: 0, 0: -5, 6: -5}
+        else:
+            legal_moves = {3: 0, 2: 0, 4: 0, 1: 0, 5: 0, 0: 0, 6: 0}
+
+        for column in columns:  # 0~6
+            print("Searching column number : ", end="")
+            print(column + 1)
+
+            if not self.isLegalMove(column, board):
+                legal_moves[column] = -9999999
+
+            if self.isLegalMove(column, board) and time() - start < 100:
+                temp = self.makeMove(board, column, currentPlayer)
+                legal_moves[column] += -self.search(depth, -999, 999, temp, enemyPlayer)  # puts in the alpha values of each choice
+
+            print("Alpha : ", end="")
+            print(legal_moves.items())
+            print("Time passed : ", end="")
+            print(time() - start)
+            if time() - start > 119:
+                break
+
+        for move, alpha in legal_moves.items():
             if alpha >= best_alpha:
                 best_alpha = alpha
                 best_move = move
 
         return best_move, best_alpha
 
-    def search(self, depth, board, currentPlayer):
+    def search(self, depth, alpha, beta, board, currentPlayer):
 
-        # return the alpha value
+        # return the max value
 
+        columns = [3, 2, 4, 1, 5, 0, 6]
         legal_moves = []
-        for i in range(7):
+
+        for i in columns:
             if self.isLegalMove(i, board):
                 temp = self.makeMove(board, i, currentPlayer)
                 legal_moves.append(temp)
 
-        if depth == 0 or len(legal_moves) == 0 or self.gameIsOver(board):
-            return self.value(board, currentPlayer)
-
         if currentPlayer == self.colors[0]:
             enemyPlayer = self.colors[1]
         else:
             enemyPlayer = self.colors[0]
 
-        alpha = -99999999
+        if depth == 0 or len(legal_moves) == 0 or self.gameIsOver(board):
+            if self.AIcolor == currentPlayer:
+                return self.value(board, currentPlayer)
+            else:
+                return self.value(board, enemyPlayer)
+
+        bestMoveValue = -9999999
 
         for child in legal_moves:
             if child is None:
                 print("No children")
-            alpha = max(alpha, -self.search(depth - 1, child, enemyPlayer))
-        return alpha
+            currValue = -self.search(depth - 1, -beta, -alpha, child, enemyPlayer)
+            bestMoveValue = max(bestMoveValue, currValue)
+            alpha = max(alpha, currValue)
 
-    def bestMoveRule(self, board, currentPlayer):
+            if alpha >= beta:
+                break
+        return bestMoveValue
+
+    def value(self, board, tile):
+
+        # evaluate the fitness of each board state for the player
+        # connect4 = 10000 points, connect3 = 100 points, connect2 = 1 point
+        # enemy point is minus points
+
+        if tile == self.colors[0]:
+            enemyTile = self.colors[1]
+        else:
+            enemyTile = self.colors[0]
+
+        connectFour = self.checkForStreak(board, tile, 4)
+        connectThree = self.checkForStreak(board, tile, 3)
+        connectTwo = self.checkForStreak(board, tile, 2)
+        enemyConnectFour = self.checkForStreak(board, enemyTile, 4)
+        enemyConnectThree = self.checkForStreak(board, enemyTile, 3)
+        enemyConnectTwo = self.checkForStreak(board, enemyTile, 2)
+
+        result = (connectFour * 10000 + connectThree * 100 + connectTwo) - \
+                 (enemyConnectFour * 10000 + enemyConnectThree * 100 + enemyConnectTwo)
+
+        return result
+
+    def bestMoveRule(self, board, currentPlayer, phase):
         """
         if currentPlayer == self.colors[0]:
             enemyPlayer = self.colors[1]
         else:
             enemyPlayer = self.colors[0]
         """
+        # currPhase = phase
 
         legal_moves = {}
 
         for column in range(7):  # 0~6
             if self.isLegalMove(column, board):
-                temp = self.makeMove(board, column, currentPlayer)
+                temp = self.make_move_rulebased(board, column, currentPlayer, local_point=0)
                 legal_moves[column] = self.rule(temp, currentPlayer)  # RULE BASED ALGORITHM
 
         best_point = -999999
         best_move = None
 
         moves = legal_moves.items()
-
-        random.shuffle(list(moves))
 
         for move, point in moves:
             if point >= best_point:
@@ -103,17 +156,32 @@ class Solver(object):
 
         # return the point value
         # MAKE THIS PART FOR RULE BASED DECISION MAKING
-        """
+
         if tile == self.colors[0]:
             enemyTile = self.colors[1]
         else:
             enemyTile = self.colors[0]
-        """
+
         point = 0
 
         connectFour = self.checkForStreak(board, tile, 4)
+        connectThree = self.checkForStreak(board, tile, 3)
+        connectTwo = self.checkForStreak(board, tile, 2)
+        enemyConnectFour = self.checkForStreak(board, enemyTile, 4)
+        enemyConnectThree = self.checkForStreak(board, enemyTile, 3)
 
-        point += connectFour * 10000000
+        if connectFour or connectThree or connectTwo:
+            point += connectFour * 10000
+            point += connectThree * 1000
+            point += connectTwo * 1
+
+        if enemyConnectFour:
+            point = point - 5000
+
+        if enemyConnectThree:
+            point = point - 1000
+
+        point = point + self.local_point
 
         return point
 
@@ -144,28 +212,26 @@ class Solver(object):
                 temp[i][column] = color
                 return temp
 
-    def value(self, board, tile):
+    def make_move_rulebased(self, board, column, color, local_point):
 
-        # evaluate the fitness of each board state for the player
-        # connect4 = 10000 points, connect3 = 100 points, connect2 = 1 point
-        # enemy point is minus points
+        self.local_point = 0
 
-        if tile == self.colors[0]:
-            enemyTile = self.colors[1]
-        else:
-            enemyTile = self.colors[0]
+        temp = [x[:] for x in board]
+        for i in range(6):
+            if temp[i][column] == ' ':
+                temp[i][column] = color
+                if i % 2 == 0:  # odd row advantage
+                    self.local_point += 30
+                if column == 4:
+                    self.local_point += 50
+                elif column == 0 or column == 6:
+                    self.local_point += 40
+                else:
+                    self.local_point = 0
 
-        connectFour = self.checkForStreak(board, tile, 4)
-        connectThree = self.checkForStreak(board, tile, 3)
-        connectTwo = self.checkForStreak(board, tile, 2)
-        enemyConnectFour = self.checkForStreak(board, enemyTile, 4)
-        # enemyConnectThree = self.checkForStreak(board, enemyTile, 3)
-        # enemyConnectTwo = self.checkForStreak(board, enemyTile, 2)
+                self.local_point = local_point
 
-        if enemyConnectFour > 0:
-            return -10000
-        else:
-            return connectFour * 10000 + connectThree * 100 + connectTwo
+                return temp
 
     def checkForStreak(self, board, tile, streak):
 
@@ -176,13 +242,15 @@ class Solver(object):
         for i in range(6):
             for j in range(7):
 
-                if board[i][j].lower() == tile.lower():
+                if board[i][j] == tile:
                     # vertical check
                     count += self.verticalCheck(i, j, board, streak)
                     # horizontal check
                     count += self.horizontalCheck(i, j, board, streak)
                     # diagonal check /, \
                     count += self.diagonalCheck(i, j, board, streak)
+                else:
+                    continue
         return count
 
     def verticalCheck(self, row, column, board, streak):
@@ -235,14 +303,14 @@ class Solver(object):
 
         line = 0
         j = column
-        for i in range(row, -1, -1):
+        for i in range(row, 6):
             if j > 6:
                 break
             elif board[i][j].lower() == board[row][column].lower():
                 line += 1
             else:
                 break
-            j += 1  # increment column when row is incremented
+            j -= 1  # increment column when row is incremented
 
         if line >= streak:
             total += 1
