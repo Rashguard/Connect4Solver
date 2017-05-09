@@ -185,10 +185,8 @@ class Game(object):
                 self.winner = self.players[1]
 
         if count > 0:
-            connectFour = True
-
-        if count == 2:
-            return connectFour
+            return True
+        return False
 
     def printState(self):
 
